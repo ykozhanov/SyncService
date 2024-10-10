@@ -5,16 +5,17 @@ from loguru import logger
 from app import SyncApp
 from config import DEBUG, DEBUG_TIMEOUT, PATH_HOST_YANDEX, PATH_LOCAL, TIMEOUT, TOKEN
 from sync_services import YandexDiskSyncService
+from exceptions import EnvError
 
 if not PATH_LOCAL:
     logger.error("ОШИБКА. Укажите синхронизируемую локальную директорию.")
-    raise ValueError
+    raise EnvError
 elif not TOKEN:
     logger.error("ОШИБКА. Укажите токен.")
-    raise ValueError
+    raise EnvError
 elif not PATH_HOST_YANDEX:
     logger.error("ОШИБКА. Укажите синхронизируемую директорию на удаленном хранилище.")
-    raise ValueError
+    raise EnvError
 
 path_local = Path(PATH_LOCAL)
 

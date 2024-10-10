@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEBUG = bool(os.environ.get("DEBUG", False))
+DEBUG = True if os.environ.get("DEBUG") == "True" else False
 TOKEN = os.environ.get("TOKEN")
 TIMEOUT = int(os.environ.get("TIMEOUT", 15))
 DEBUG_TIMEOUT = int(os.environ.get("DEBUG_TIMEOUT", 3))

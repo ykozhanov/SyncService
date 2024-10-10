@@ -4,6 +4,8 @@ from pathlib import Path
 import requests
 from loguru import logger
 
+from exceptions import RequestError, APIUrlsError, NotFoundHostPathError
+
 
 class SyncService(ABC):
     """
@@ -34,6 +36,10 @@ class SyncService(ABC):
 
         Возвращает:
             bool: True, если загрузка успешна, иначе False.
+
+        Исключения:
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
         """
 
         pass
@@ -48,6 +54,10 @@ class SyncService(ABC):
 
         Возвращает:
             bool: True, если обновление успешна, иначе False.
+
+        Исключения:
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
         """
 
         pass
@@ -62,6 +72,10 @@ class SyncService(ABC):
 
         Возвращает:
             bool: True, если файл успешно удален, иначе False.
+
+        Исключения:
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
         """
 
         pass
@@ -73,6 +87,10 @@ class SyncService(ABC):
 
         Возвращает:
             dict[str, str]: Словарь с именами файлов и их MD5-хешами.
+
+        Исключения:
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
         """
 
         pass
@@ -118,30 +136,33 @@ class YandexDiskSyncService(SyncService):
             bool: True, если загрузка успешна, иначе выбрасывает исключение.
 
         Исключения:
-            Exception: Если загрузка не удалась.
-        """
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
+
+         Примечание: Метод ожидает наличие файла по указанному пути.
+         Если файл отсутствует, будет выброшено исключение FileNotFoundError.
+         """
 
         url = self._urls.get("load")
 
         if not url:
-            raise ValueError(
-                "ОШИБКА. Внутренняя ошибка приложения. Не найдено URL для работы с API в urls."
-            )
+            raise APIUrlsError
 
         url = url.format(self._path_host / path_local_file.name, False)
 
-        get_url_for_load = requests.get(url=url, headers=self._headers)
+        get_url_for_load = requests.get(url=url, headers=self._headers, timeout=60)
+
         data_get_url_for_load = get_url_for_load.json()
         url_for_load = data_get_url_for_load["href"]
 
         with open(path_local_file, "rb") as f:
-            response = requests.put(url=url_for_load, data=f)
+            response = requests.put(url=url_for_load, data=f, timeout=60)
 
         if response.status_code == 201:
             return True
         else:
             data = response.json()
-            raise Exception(data["message"])
+            raise RequestError("Ошибка при работе с запросом: {}".format(data["message"]))
 
     def reload(self, path_local_file: Path) -> bool:
         """
@@ -154,30 +175,29 @@ class YandexDiskSyncService(SyncService):
             bool: True, если обновление успешна, иначе выбрасывает исключение.
 
         Исключения:
-            Exception: Если обновление не удалось.
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
         """
 
         url = self._urls.get("load")
 
         if not url:
-            raise ValueError(
-                "ОШИБКА. Внутренняя ошибка приложения. Не найдено URL для работы с API в urls."
-            )
+            raise APIUrlsError
 
         url = url.format(self._path_host / path_local_file.name, True)
 
-        get_url_for_reload = requests.get(url=url, headers=self._headers)
+        get_url_for_reload = requests.get(url=url, headers=self._headers, timeout=60)
         data_get_url_for_reload = get_url_for_reload.json()
         url_for_reload = data_get_url_for_reload["href"]
 
         with open(path_local_file, "rb") as f:
-            response = requests.put(url=url_for_reload, data=f)
+            response = requests.put(url=url_for_reload, data=f, timeout=60)
 
         if response.status_code == 201:
             return True
         else:
             data = response.json()
-            raise Exception(data["message"])
+            raise RequestError("Ошибка при работе с запросом: {}".format(data["message"]))
 
     def delete(self, filename: str) -> bool:
         """
@@ -189,27 +209,26 @@ class YandexDiskSyncService(SyncService):
         Возвращает:
             bool: True, если файл успешно удален, иначе выбрасывает исключение.
 
-         Исключения:
-             Exception: Если удаление не удалось.
+        Исключения:
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
         """
 
         path_file = self._path_host / filename
         url = self._urls.get("delete")
 
         if not url:
-            raise ValueError(
-                "ОШИБКА. Внутренняя ошибка приложения. Не найдено URL для работы с API в urls."
-            )
+            raise APIUrlsError
 
         url = url.format(path_file)
 
-        response = requests.delete(url=url, headers=self._headers)
+        response = requests.delete(url=url, headers=self._headers, timeout=60)
 
         if response.status_code == 204:
             return True
         else:
             data = response.json()
-            raise Exception(data["message"])
+            raise RequestError("Ошибка при работе с запросом: {}".format(data["message"]))
 
     def get_info(self) -> dict[str, str]:
         """
@@ -219,19 +238,18 @@ class YandexDiskSyncService(SyncService):
             dict[str, str]: Словарь с именами файлов и их MD5-хешами.
 
         Исключения:
-            Exception: Если получение информации не удалось.
+            RequestError: Если запрос не удался.
+            APIUrlsError: Если URL для работы с API отсутствует.
         """
 
         url = self._urls.get("get_info")
 
         if not url:
-            raise ValueError(
-                "ОШИБКА. Внутренняя ошибка приложения. Не найдено URL для работы с API в urls."
-            )
+            raise APIUrlsError
 
         url = url.format(self._path_host)
 
-        response = requests.get(url=url, headers=self._headers)
+        response = requests.get(url=url, headers=self._headers, timeout=60)
         data = response.json()
 
         logger.debug("Полученные данные с удаленного хранилища: {}".format(data))
@@ -244,5 +262,7 @@ class YandexDiskSyncService(SyncService):
             }
 
             return files_host
+        elif response.status_code == 404:
+            raise NotFoundHostPathError
         else:
-            raise Exception(data["message"])
+            raise RequestError("Ошибка при работе с запросом: {}".format(data["message"]))
